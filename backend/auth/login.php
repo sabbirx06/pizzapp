@@ -19,13 +19,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $_SESSION['username']= $user['username'];
 
         // Redirect by role
-        if ($user['role'] === 'customer') {
-            header('Location: ../../frontend/customer_dashboard.php');
-        } elseif ($user['role'] === 'driver') {
-            header('Location: ../../frontend/driver_dashboard.php');
-        } elseif ($user['role'] === 'admin') {
-            header('Location: ../../frontend/admin_dashboard.php');
-        }
+               header('Location: ../../frontend/dashboard.php');
     } else {
         header('Location: ../../frontend/login.html?error=invalid');
     }
