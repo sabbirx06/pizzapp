@@ -243,20 +243,15 @@ app.post("/place-order", requireLogin, (req, res) => {
       const total_orders = (customer.total_orders || 0) + 1;
       const total_spending = (customer.total_spending || 0) + total;
 
-      // 🔹 Step 3: Get all discounts
+      // 🔹 Step 3: Get discounts
       db.query("SELECT * FROM Discounts", (err2, discounts) => {
         let bestDiscount = null;
 
         discounts.forEach((d) => {
           let valid = true;
 
-          if (d.min_orders && total_orders < d.min_orders) {
-            valid = false;
-          }
-
-          if (d.min_spending && total_spending < d.min_spending) {
-            valid = false;
-          }
+          if (d.min_orders && total_orders < d.min_orders) valid = false;
+          if (d.min_spending && total_spending < d.min_spending) valid = false;
 
           if (valid) {
             if (
@@ -267,12 +262,10 @@ app.post("/place-order", requireLogin, (req, res) => {
             }
           }
         });
-        console.log("BEST DISCOUNT", bestDiscount);
 
         let finalTotal = total;
         let discount_id = null;
 
-        // 🔥 Apply discount
         if (bestDiscount) {
           discount_id = bestDiscount.discount_id;
           finalTotal = total - (total * bestDiscount.discount_percent) / 100;
@@ -309,13 +302,16 @@ app.post("/place-order", requireLogin, (req, res) => {
               );
             });
 
-            // 🔹 Step 6: Create delivery
+            // 🔥 Step 6: ETA (30 mins from now)
+            const estimatedTime = new Date(Date.now() + 30 * 60000);
+
+            // 🔹 Step 7: Create delivery
             db.query(
-              "INSERT INTO Delivery (order_id, delivery_status) VALUES (?, 'pending')",
-              [order_id],
+              "INSERT INTO Delivery (order_id, delivery_status, estimated_time) VALUES (?, 'pending', ?)",
+              [order_id, estimatedTime],
             );
 
-            // 🔹 Step 7: Update customer stats
+            // 🔹 Step 8: Update customer stats
             db.query(
               `UPDATE Customer 
                SET total_orders = total_orders + 1,
@@ -324,13 +320,28 @@ app.post("/place-order", requireLogin, (req, res) => {
               [finalTotal, user.user_id],
             );
 
-            // 🔹 Step 8: Clear cart
+            // 🔹 Step 9: Clear cart
             req.session.cart = [];
 
-            res.redirect("/orders");
+            // ✅ FINAL REDIRECT (THIS IS THE IMPORTANT CHANGE)
+            res.redirect(`/order-confirmation/${order_id}`);
           },
         );
       });
+    },
+  );
+});
+
+app.get("/order-confirmation/:id", requireRole("customer"), (req, res) => {
+  const orderId = req.params.id;
+
+  db.query(
+    `SELECT o.order_id, o.total_amount, o.created_at
+     FROM Orders o
+     WHERE o.order_id=?`,
+    [orderId],
+    (err, result) => {
+      res.render("confirmation", { order: result[0] });
     },
   );
 });
@@ -517,19 +528,26 @@ app.get("/orders/status", requireRole("customer"), (req, res) => {
       o.created_at,
       o.total_amount,
       d.delivery_status,
+      d.estimated_time,
+      d.driver_id,
+      dr.full_name AS driver_name,
+      dr.phone AS driver_phone,
       oi.item_id,
       oi.quantity,
       p.name AS pizza_name,
       c.crust_name
-     FROM Orders o
-     LEFT JOIN Delivery d ON o.order_id = d.order_id
-     LEFT JOIN Order_Items oi ON o.order_id = oi.order_id
-     LEFT JOIN Pizza p ON oi.pizza_id = p.pizza_id
-     LEFT JOIN Crust c ON oi.crust_id = c.crust_id
-     WHERE o.customer_id=?
-     ORDER BY o.order_id DESC`,
+    FROM Orders o
+    LEFT JOIN Delivery d ON o.order_id = d.order_id
+    LEFT JOIN Driver dr ON d.driver_id = dr.driver_id
+    LEFT JOIN Order_Items oi ON o.order_id = oi.order_id
+    LEFT JOIN Pizza p ON oi.pizza_id = p.pizza_id
+    LEFT JOIN Crust c ON oi.crust_id = c.crust_id
+    WHERE o.customer_id=?
+    ORDER BY o.order_id DESC`,
     [customer_id],
     (err, rows) => {
+      if (err) return res.json([]);
+
       const orders = {};
 
       rows.forEach((r) => {
@@ -539,6 +557,12 @@ app.get("/orders/status", requireRole("customer"), (req, res) => {
             total_amount: r.total_amount,
             created_at: r.created_at,
             delivery_status: r.delivery_status,
+
+            // 🔥 FIXES
+            estimated_time: r.estimated_time,
+            driver_name: r.driver_name,
+            driver_phone: r.driver_phone,
+
             items: [],
           };
         }

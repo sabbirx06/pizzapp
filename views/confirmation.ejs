@@ -1,0 +1,21 @@
+<% title="Order Confirmed"; css=['/css/base.css']; %>
+<%- include('partials/head') %>
+
+<body>
+<div class="container mt-5 text-center">
+
+  <h2 class="brand-text">🎉 Order Confirmed!</h2>
+
+  <div class="cart-card mt-4 p-4">
+    <h4>Order #<%= order.order_id %></h4>
+    <p>Total: ৳ <%= order.total_amount %></p>
+    <p>Date: <%= new Date(order.created_at).toLocaleString() %></p>
+
+    <p class="mt-3">Estimated delivery: ~30 minutes</p>
+
+    <a href="/orders" class="btn btn-primary mt-3">Track Order</a>
+  </div>
+
+</div>
+</body>
+</html>

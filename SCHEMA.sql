@@ -118,6 +118,9 @@ CREATE TABLE Delivery (
     FOREIGN KEY (driver_id) REFERENCES Driver(driver_id)
 );
 
+-- Adding estimated_time column
+ALTER TABLE Delivery ADD estimated_time DATETIME;
+
 -- SAMPLE DATA
 INSERT INTO Crust (crust_name, extra_price) VALUES
 ('Thin Crust', 0.00), ('Stuffed Crust', 1.50), ('Thick Crust', 0.50), ('Gluten Free', 2.00);

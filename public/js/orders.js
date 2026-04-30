@@ -63,6 +63,7 @@ export async function initOrders() {
               <span class="badge rounded-pill ${status.class}">
                 ${status.text}
               </span>
+              
             </div>
 
             <div class="tracking-bar">
@@ -77,6 +78,18 @@ export async function initOrders() {
 
             <p class="price">৳ ${o.total_amount}</p>
             <p class="date">${new Date(o.created_at).toLocaleString()}</p>
+            <p class="sub-text">
+  ⏱ ETA: ${
+    o.estimated_time
+      ? new Date(o.estimated_time).toLocaleTimeString()
+      : "Calculating..."
+  }
+</p>
+<p class="sub-text">
+  🚗 Driver: ${o.driver_name || "Not assigned"}
+  ${o.driver_phone ? `(${o.driver_phone})` : ""}
+</p>
+           
 
           </div>
         </div>
