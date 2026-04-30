@@ -1,32 +1,28 @@
-<!DOCTYPE html>
-<html>
-  <head>
-    <title>Admin Dashboard</title>
-    <link
-      rel="stylesheet"
-      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
-    />
-  </head>
+<% title = 'Admin Dashboard'; css = ['/css/base.css', '/css/style.css']; %>
+<%- include('partials/head') %>
 
-  <body class="bg-dark text-white">
-    <div class="container mt-5">
-      <h2 class="mb-4">🛠 Admin Dashboard</h2>
+<body>
+  <%- include('partials/navbar') %>
 
-      <div class="row">
-        <div class="col-md-6">
-          <div class="p-4 rounded text-white bg-primary">
-            <h5>Total Orders</h5>
-            <h2><%= stats.total_orders %></h2>
-          </div>
+  <div class="container mt-5">
+    <h2 class="brand-text mb-4">🛠️ Admin Dashboard</h2>
+
+    <div class="row g-4">
+      <div class="col-md-6">
+        <div class="dashboard-card p-4 rounded bg-primary text-white">
+          <h5>Total Orders</h5>
+          <h2><%= stats.total_orders %></h2>
         </div>
+      </div>
 
-        <div class="col-md-6">
-          <div class="p-4 rounded text-white bg-success">
-            <h5>Total Revenue</h5>
-            <h2>৳ <%= stats.revenue || 0 %></h2>
-          </div>
+      <div class="col-md-6">
+        <div class="dashboard-card p-4 rounded bg-success text-white">
+          <h5>Total Revenue</h5>
+          <h2>৳ <%= stats.revenue || 0 %></h2>
         </div>
       </div>
     </div>
-  </body>
+  </div>
+<%- include('partials/footer') %>
+</body>
 </html>

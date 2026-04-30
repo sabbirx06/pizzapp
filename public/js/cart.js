@@ -1,5 +1,5 @@
 export async function initCart() {
-  const res = await fetch("/cart-data");
+  const res = await fetch("/get-discount");
   const data = await res.json();
 
   const container = document.getElementById("cart-list");
@@ -46,7 +46,7 @@ export async function initCart() {
   document.getElementById("total").innerHTML = `
   <div class="summary-right">
     <div>Subtotal: ৳ ${data.subtotal}</div>
-    <div>Discount: ৳ ${data.discount}</div>
+    <div>Discount: ৳ ${data.discountAmount}</div>
     <div class="fw-bold">Total: ৳ ${data.finalTotal}</div>
   </div>
 `;

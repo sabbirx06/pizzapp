@@ -1,15 +1,25 @@
-<nav class="navbar navbar-expand navbar-light px-4">
-  <a class="navbar-brand brand-text" href="/menu">🍕 PizzApp</a>
+<nav class="navbar role-navbar">
+  <a class="navbar-brand brand-text" href="<%= role === 'admin' ? '/admin' : role === 'driver' ? '/driver' : '/menu' %>">🍕 PizzApp</a>
 
-  <div class="ms-auto d-flex gap-2">
-    <a href="/user-dashboard" class="btn btn-outline-light">Dashboard</a>
-    <a href="/menu" class="btn btn-outline-primary">Menu</a>
-    <a href="/cart" class="btn btn-outline-primary">Cart</a>
-    <a href="/orders" class="btn btn-outline-primary">Orders</a>
-    <a href="/history" class="btn btn-outline-light">History</a>
+  <div class="navbar-main">
+    <div class="nav-tab-list">
+      <% if (role === 'admin') { %>
+        <a href="/admin" class="nav-tab <%= page === 'admin' ? 'active' : '' %>">Admin Panel</a>
+        <a href="/admin-dashboard" class="nav-tab <%= page === 'admin-dashboard' ? 'active' : '' %>">Dashboard</a>
+      <% } else if (role === 'driver') { %>
+        <a href="/driver" class="nav-tab <%= page === 'driver' ? 'active' : '' %>">Driver Panel</a>
+        <a href="/driver-dashboard" class="nav-tab <%= page === 'driver-dashboard' ? 'active' : '' %>">Dashboard</a>
+      <% } else { %>
+        <a href="/user-dashboard" class="nav-tab <%= page === 'user-dashboard' ? 'active' : '' %>">Dashboard</a>
+        <a href="/menu" class="nav-tab <%= page === 'menu' ? 'active' : '' %>">Menu</a>
+        <a href="/cart" class="nav-tab <%= page === 'cart' ? 'active' : '' %>">Cart</a>
+        <a href="/orders" class="nav-tab <%= page === 'orders' ? 'active' : '' %>">Orders</a>
+        <a href="/history" class="nav-tab <%= page === 'history' ? 'active' : '' %>">History</a>
+      <% } %>
+    </div>
 
-    <form action="/logout" method="POST">
-      <button class="btn btn-danger">Logout</button>
+    <form action="/logout" method="POST" class="nav-tab-form">
+      <button class="nav-tab logout-btn" type="submit">Logout</button>
     </form>
   </div>
 </nav>

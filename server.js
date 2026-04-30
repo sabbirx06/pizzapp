@@ -40,12 +40,12 @@ app.get("/login", (req, res) => res.render("login"));
 app.get("/signup", (req, res) => res.render("signup"));
 // ADMIN
 app.get("/admin", requireRole("admin"), (req, res) => {
-  res.render("admin");
+  res.render("admin", { page: "admin", role: req.session.user.role });
 });
 
 // DRIVER
 app.get("/driver", requireRole("driver"), (req, res) => {
-  res.render("driver");
+  res.render("driver", { page: "driver", role: req.session.user.role });
 });
 
 app.post("/logout", (req, res) => {
@@ -136,8 +136,12 @@ app.post("/signup", (req, res) => {
 });
 
 // ===== VIEWS =====
-app.get("/menu", requireLogin, (req, res) => res.render("menu"));
-app.get("/cart", requireLogin, (req, res) => res.render("cart"));
+app.get("/menu", requireLogin, (req, res) =>
+  res.render("menu", { page: "menu", role: req.session.user.role }),
+);
+app.get("/cart", requireLogin, (req, res) =>
+  res.render("cart", { page: "cart", role: req.session.user.role }),
+);
 
 // ===== DATA APIs =====
 app.get("/get-pizzas", requireLogin, (req, res) => {
@@ -188,11 +192,19 @@ app.get("/get-discount", requireLogin, (req, res) => {
         });
 
         let finalTotal = total;
+        let discountAmount = 0;
         if (bestDiscount) {
-          finalTotal = total - (total * bestDiscount.discount_percent) / 100;
+          discountAmount = (total * bestDiscount.discount_percent) / 100;
+          finalTotal = total - discountAmount;
         }
 
-        res.json({ discount: bestDiscount, finalTotal });
+        res.json({
+          discount: bestDiscount,
+          discountAmount,
+          finalTotal,
+          subtotal: total,
+          items: cart,
+        });
       });
     },
   );
@@ -371,7 +383,7 @@ app.get("/order-confirmation/:id", requireRole("customer"), (req, res) => {
 });
 
 app.get("/history", requireRole("customer"), (req, res) => {
-  res.render("history");
+  res.render("history", { page: "history", role: req.session.user.role });
 });
 
 app.get("/history-data", requireRole("customer"), (req, res) => {
@@ -537,7 +549,7 @@ app.get("/orders/data", requireRole("customer"), (req, res) => {
 });
 
 app.get("/orders", requireRole("customer"), (req, res) => {
-  res.render("orders");
+  res.render("orders", { page: "orders", role: req.session.user.role });
 });
 
 // ==========================
@@ -614,6 +626,8 @@ app.get("/user-dashboard", requireRole("customer"), (req, res) => {
     [userId],
     (err, result) => {
       res.render("user-dashboard", {
+        page: "user-dashboard",
+        role: req.session.user.role,
         stats: result[0] || { total_orders: 0, total_spending: 0 },
       });
     },
@@ -626,6 +640,8 @@ app.get("/admin-dashboard", requireRole("admin"), (req, res) => {
     "SELECT COUNT(*) AS total_orders, SUM(total_amount) AS revenue FROM Orders",
     (err, result) => {
       res.render("admin-dashboard", {
+        page: "admin-dashboard",
+        role: req.session.user.role,
         stats: result[0] || { total_orders: 0, revenue: 0 },
       });
     },
@@ -641,6 +657,8 @@ app.get("/driver-dashboard", requireRole("driver"), (req, res) => {
     [driverId],
     (err, result) => {
       res.render("driver-dashboard", {
+        page: "driver-dashboard",
+        role: req.session.user.role,
         stats: result[0] || { delivered: 0 },
       });
     },
