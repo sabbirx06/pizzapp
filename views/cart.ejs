@@ -7,6 +7,7 @@
 
 <div class="container mt-5">
 
+  <!-- HEADER -->
   <div class="d-flex justify-content-between align-items-center mb-4">
     <h2 class="brand-text">🛒 Your Cart</h2>
 
@@ -15,19 +16,29 @@
     </a>
   </div>
 
-  <!-- CENTER FIX -->
-  <div id="cart-list" class="row g-4 justify-content-center"></div>
+  <!-- MAIN CART CARD -->
+  
 
-  <!-- SUMMARY -->
-  <div class="cart-summary mt-5 p-4 mx-auto">
-    <h3 id="total"></h3>
+    <div class="cart-card-main w-100">
 
-    <form action="/place-order" method="POST">
-      <button class="btn btn-primary w-100 mt-3">
-        Place Order
-      </button>
-    </form>
-  </div>
+      <!-- ITEMS WILL LOAD HERE -->
+      <div id="cart-list"></div>
+
+      <hr>
+
+      <!-- SUMMARY -->
+      <div id="total"></div>
+
+      <!-- ORDER BUTTON -->
+      <form action="/place-order" method="POST">
+        <button class="btn btn-primary w-100 mt-3">
+          Place Order
+        </button>
+      </form>
+
+    </div>
+
+  
 
 </div>
 

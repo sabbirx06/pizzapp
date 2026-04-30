@@ -332,6 +332,30 @@ app.post("/place-order", requireLogin, (req, res) => {
   );
 });
 
+app.get("/cart-data", (req, res) => {
+  const cart = req.session.cart || [];
+
+  let subtotal = 0;
+
+  cart.forEach((item) => {
+    subtotal += Number(item.price) * Number(item.quantity);
+  });
+
+  let discount = 0;
+  if (subtotal > 2000) {
+    discount = subtotal * 0.1;
+  }
+
+  const finalTotal = subtotal - discount;
+
+  res.json({
+    items: cart,
+    subtotal,
+    discount,
+    finalTotal,
+  });
+});
+
 app.get("/order-confirmation/:id", requireRole("customer"), (req, res) => {
   const orderId = req.params.id;
 
