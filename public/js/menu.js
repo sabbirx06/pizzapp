@@ -37,10 +37,12 @@ export async function initMenu() {
           ${toppings
             .map(
               (t) => `
-            <label class="topping-item">
-              <input type="checkbox" value="${t.topping_id}" data-price="${t.extra_price}">
+            <button 
+              class="btn topping-pill" 
+              data-id="${t.topping_id}" 
+              data-price="${t.extra_price}">
               ${t.topping_name}
-            </label>
+            </button>
           `,
             )
             .join("")}
@@ -54,25 +56,32 @@ export async function initMenu() {
       </div>
     `;
 
+    // 🔥 Toggle pill
+    const pills = col.querySelectorAll(".topping-pill");
+    pills.forEach((pill) => {
+      pill.onclick = () => {
+        pill.classList.toggle("active-pill");
+      };
+    });
+
     col.querySelector(".add-btn").onclick = async () => {
       const crustEl = col.querySelector(".crust");
 
-      const basePrice = Number(p.base_price); // ✅ FIX
+      const basePrice = Number(p.base_price);
       const crust_price = Number(crustEl.selectedOptions[0].dataset.price);
 
-      const checked = [...col.querySelectorAll("input[type=checkbox]:checked")];
+      const selectedPills = [...col.querySelectorAll(".active-pill")];
 
-      const toppingsData = checked.map((c) => ({
-        id: c.value,
-        name: c.parentElement.innerText.trim(),
-        price: Number(c.dataset.price),
+      const toppingsData = selectedPills.map((pill) => ({
+        id: pill.dataset.id,
+        name: pill.innerText,
+        price: Number(pill.dataset.price),
       }));
 
       const topping_price = toppingsData.reduce((s, t) => s + t.price, 0);
-
       const qty = Number(col.querySelector(".qty").value);
 
-      const price = basePrice + crust_price + topping_price; // ✅ FIXED
+      const price = basePrice + crust_price + topping_price;
 
       await fetch("/add-to-cart", {
         method: "POST",

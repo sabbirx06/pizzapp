@@ -1,0 +1,25 @@
+<% title = 'Admin Dashboard'; css = ['/css/base.css', '/css/style.css']; %>
+<%- include('partials/head') %>
+
+<body>
+
+<%- include('partials/navbar') %>
+
+<div class="container mt-5">
+
+  <h2 class="brand-text mb-4">🛠️ Admin Panel</h2>
+
+  <div class="admin-section">
+    <h4>All Orders</h4>
+    <div id="admin-orders"></div>
+  </div>
+
+</div>
+
+<script type="module">
+  import { initAdmin } from "/js/admin.js";
+  initAdmin();
+</script>
+
+</body>
+</html>
