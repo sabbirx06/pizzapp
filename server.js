@@ -264,8 +264,6 @@ app.get("/get-discount", requireLogin, (req, res) => {
       if (err) return res.json({ discount: null, finalTotal: total });
 
       const customer = customerRes[0];
-      const total_orders = (customer.total_orders || 0) + 1;
-      const total_spending = (customer.total_spending || 0) + total;
 
       // Fetch all discounts and choose best match
       db.query("SELECT * FROM Discounts", (err2, discounts) => {
@@ -289,7 +287,9 @@ app.get("/get-discount", requireLogin, (req, res) => {
         let finalTotal = total;
 
         if (bestDiscount) {
+          // Calculate the money saved: (Original Price * Discount Percentage) / 100
           discountAmount = (total * bestDiscount.discount_percent) / 100;
+          // Subtract the saved money from the original price
           finalTotal = total - discountAmount;
         }
 
@@ -365,30 +365,36 @@ app.post("/place-order", requireLogin, (req, res) => {
     [user.user_id],
     (err, customerRes) => {
       const customer = customerRes[0];
-      const total_orders = (customer.total_orders || 0) + 1;
-      const total_spending = (customer.total_spending || 0) + total;
 
       db.query("SELECT * FROM Discounts", (err2, discounts) => {
-        let bestDiscount = null;
+        let bestDiscount = null; // Start with no discount
 
-        discounts.forEach((d) => {
-          let valid = true;
+        // Flip Through Every Coupon
+        discounts.forEach((discount) => {
+          let isCouponValid = true; // Assume the coupon works until proven otherwise
 
-          if (d.min_orders !== null && total_orders < d.min_orders)
-            valid = false;
-          if (d.min_spending !== null && total_spending < d.min_spending)
-            valid = false;
+          // Check the rules on the coupon
+          // Rule 1: Do they have enough past orders?
+          if (
+            discount.min_orders !== null &&
+            predictedTotalOrders < discount.min_orders
+          ) {
+            isCouponValid = false; // Not enough orders, cross it out
+          }
 
           if (valid && (!bestDiscount || d.discount_percent > bestDiscount.discount_percent)) {
             bestDiscount = d;
           }
         });
 
+        // Do the Math at the Register
         let finalTotal = total;
         let discount_id = null;
 
         if (bestDiscount) {
-          discount_id = bestDiscount.discount_id;
+          discount_id = bestDiscount.discount_id; // Write down the coupon ID for the receipt
+
+          // Calculate the final price: Original Price - (Original Price * Discount Percentage) / 100
           finalTotal = total - (total * bestDiscount.discount_percent) / 100;
         }
 
