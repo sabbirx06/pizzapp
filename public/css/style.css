@@ -110,10 +110,14 @@ body {
 
 .navbar-main {
   flex: 1;
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
   align-items: center;
-  justify-content: center;
   gap: 1rem;
+}
+
+.navbar-user-info {
+  margin-left: 0;
 }
 
 .nav-tab-list {
@@ -122,8 +126,15 @@ body {
   gap: 0.5rem;
   justify-content: center;
   align-items: center;
-  width: 100%;
-  max-width: 760px;
+  grid-column: 2;
+}
+
+.navbar-right {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  grid-column: 3;
+  justify-self: end;
 }
 
 .nav-tab {

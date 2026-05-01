@@ -2,7 +2,7 @@
   <a class="navbar-brand brand-text" href="<%= role === 'admin' ? '/admin' : role === 'driver' ? '/driver' : '/menu' %>">🍕 PizzApp</a>
 
   <div class="navbar-main">
-    <div class="nav-tab-list">
+    <div class="nav-tab-list ">
       <% if (role === 'admin') { %>
         <a href="/admin" class="nav-tab <%= page === 'admin' ? 'active' : '' %>">Admin Panel</a>
         <a href="/admin-dashboard" class="nav-tab <%= page === 'admin-dashboard' ? 'active' : '' %>">Dashboard</a>
@@ -18,8 +18,14 @@
       <% } %>
     </div>
 
-    <form action="/logout" method="POST" class="nav-tab-form">
-      <button class="nav-tab logout-btn" type="submit">Logout</button>
-    </form>
+    <div class="navbar-right">
+      <div class="navbar-user-info">
+        <span class="nav-tab user-greeting">Welcome, <%= user.username %></span>
+      </div>
+
+      <form action="/logout" method="POST" class="nav-tab-form">
+        <button class="nav-tab logout-btn" type="submit">Logout</button>
+      </form>
+    </div>
   </div>
 </nav>
