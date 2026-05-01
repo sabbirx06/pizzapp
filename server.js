@@ -310,7 +310,7 @@ app.post("/place-order", requireLogin, (req, res) => {
             isCouponValid = false; // Not enough orders, cross it out
           }
 
-          // Rule 2: Have they spent enough money in the past?
+          // Rule 2: Have they spent enough money in the past? .
           if (
             discount.min_spending !== null &&
             predictedTotalSpending < discount.min_spending
