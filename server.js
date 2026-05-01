@@ -169,6 +169,7 @@ app.get("/get-discount", requireLogin, (req, res) => {
     total += Number(item.price) * Number(item.quantity);
   });
 
+  // Step 1: Look at the Customer's History in the database
   db.query(
     "SELECT total_orders, total_spending FROM Customer WHERE customer_id=?",
     [user.user_id],
@@ -176,33 +177,59 @@ app.get("/get-discount", requireLogin, (req, res) => {
       if (err) return res.json({ discount: null, finalTotal: total });
 
       const customer = customerRes[0];
-      const total_orders = (customer.total_orders || 0) + 1;
-      const total_spending = (customer.total_spending || 0) + total;
 
+      // Calculate what their stats will be AFTER they complete this current order
+      const predictedTotalOrders = (customer.total_orders || 0) + 1;
+      const predictedTotalSpending = (customer.total_spending || 0) + total;
+
+      // Step 2: Grab the Coupon Book (all available discounts)
       db.query("SELECT * FROM Discounts", (err2, discounts) => {
         if (err2) return res.json({ discount: null, finalTotal: total });
 
-        let bestDiscount = null;
-        discounts.forEach((d) => {
-          let valid = true;
-          if (d.min_orders !== null && total_orders < d.min_orders)
-            valid = false;
-          if (d.min_spending !== null && total_spending < d.min_spending)
-            valid = false;
+        let bestDiscount = null; // Start with no discount
+
+        // Step 3: Flip Through Every Coupon
+        discounts.forEach((discount) => {
+          let isCouponValid = true; // Assume the coupon works until proven otherwise
+
+          // Step 4: Check the rules on the coupon
+          // Rule 1: Do they have enough past orders?
           if (
-            valid &&
-            (!bestDiscount ||
-              Number(d.discount_percent) >
-                Number(bestDiscount.discount_percent))
+            discount.min_orders !== null &&
+            predictedTotalOrders < discount.min_orders
           ) {
-            bestDiscount = d;
+            isCouponValid = false; // Not enough orders, cross it out
+          }
+
+          // Rule 2: Have they spent enough money in the past?
+          if (
+            discount.min_spending !== null &&
+            predictedTotalSpending < discount.min_spending
+          ) {
+            isCouponValid = false; // Haven't spent enough, cross it out
+          }
+
+          // Step 5: Keep the coupon that gives the biggest percentage off
+          if (isCouponValid) {
+            // If we don't have a best discount yet, OR if this new one is bigger than our current best
+            if (
+              !bestDiscount ||
+              Number(discount.discount_percent) >
+                Number(bestDiscount.discount_percent)
+            ) {
+              bestDiscount = discount; // This is our new best coupon!
+            }
           }
         });
 
+        // Step 6: Do the Math at the Register
         let finalTotal = total;
         let discountAmount = 0;
+
         if (bestDiscount) {
+          // Calculate the money saved: (Original Price * Discount Percentage) / 100
           discountAmount = (total * bestDiscount.discount_percent) / 100;
+          // Subtract the saved money from the original price
           finalTotal = total - discountAmount;
         }
 
@@ -255,42 +282,63 @@ app.post("/place-order", requireLogin, (req, res) => {
     total += Number(item.price) * Number(item.quantity);
   });
 
-  // 🔹 Step 2: Get customer stats
+  // 🔹 Step 2: Look at the Customer's History in the database
   db.query(
     "SELECT total_orders, total_spending FROM Customer WHERE customer_id=?",
     [user.user_id],
     (err, customerRes) => {
       const customer = customerRes[0];
-      const total_orders = (customer.total_orders || 0) + 1;
-      const total_spending = (customer.total_spending || 0) + total;
 
-      // 🔹 Step 3: Get discounts
+      // Calculate what their stats will be AFTER they complete this current order
+      const predictedTotalOrders = (customer.total_orders || 0) + 1;
+      const predictedTotalSpending = (customer.total_spending || 0) + total;
+
+      // 🔹 Step 3: Grab the Coupon Book (all available discounts)
       db.query("SELECT * FROM Discounts", (err2, discounts) => {
-        let bestDiscount = null;
+        let bestDiscount = null; // Start with no discount
 
-        discounts.forEach((d) => {
-          let valid = true;
+        // Flip Through Every Coupon
+        discounts.forEach((discount) => {
+          let isCouponValid = true; // Assume the coupon works until proven otherwise
 
-          if (d.min_orders !== null && total_orders < d.min_orders)
-            valid = false;
-          if (d.min_spending !== null && total_spending < d.min_spending)
-            valid = false;
+          // Check the rules on the coupon
+          // Rule 1: Do they have enough past orders?
+          if (
+            discount.min_orders !== null &&
+            predictedTotalOrders < discount.min_orders
+          ) {
+            isCouponValid = false; // Not enough orders, cross it out
+          }
 
-          if (valid) {
+          // Rule 2: Have they spent enough money in the past?
+          if (
+            discount.min_spending !== null &&
+            predictedTotalSpending < discount.min_spending
+          ) {
+            isCouponValid = false; // Haven't spent enough, cross it out
+          }
+
+          // Keep the coupon that gives the biggest percentage off
+          if (isCouponValid) {
+            // If we don't have a best discount yet, OR if this new one is bigger than our current best
             if (
               !bestDiscount ||
-              Number(d.discount_percent) > Number(bestDiscount.discount_percent)
+              Number(discount.discount_percent) >
+                Number(bestDiscount.discount_percent)
             ) {
-              bestDiscount = d;
+              bestDiscount = discount; // This is our new best coupon!
             }
           }
         });
 
+        // Do the Math at the Register
         let finalTotal = total;
         let discount_id = null;
 
         if (bestDiscount) {
-          discount_id = bestDiscount.discount_id;
+          discount_id = bestDiscount.discount_id; // Write down the coupon ID for the receipt
+
+          // Calculate the final price: Original Price - (Original Price * Discount Percentage) / 100
           finalTotal = total - (total * bestDiscount.discount_percent) / 100;
         }
 
