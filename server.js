@@ -6,11 +6,28 @@ const session = require("express-session"); //checks whether the user is logged 
 const app = express();
 const PORT = 3000;
 
+/* =========================
+   BASIC MIDDLEWARE SETUP
+   ========================= */
+
+// Parses form data (HTML forms)
 app.use(express.urlencoded({ extended: true }));
-app.use(express.json()); // javascript object notation
+
+// Parses JSON requests (API calls from frontend JS)
+app.use(express.json());
+
+// Serves static files like CSS, JS, images from /public folder
 app.use(express.static(path.join(__dirname, "public")));
+
+// Sets EJS as template engine (for rendering dynamic pages)
 app.set("view engine", "ejs");
 
+/* =========================
+   SESSION MANAGEMENT
+   =========================
+   - Stores logged-in user data in browser session
+   - Keeps user logged in across pages
+*/
 app.use(
   session({
     secret: "secret-key",
@@ -19,6 +36,15 @@ app.use(
   }),
 );
 
+/* =========================
+   AUTHORIZATION HELPERS
+   ========================= */
+
+/*
+  requireRole(role)
+  - Protects routes based on user role
+  - Example: admin page only accessible to admin users
+*/
 function requireRole(role) {
   return (req, res, next) => {
     if (!req.session.user) return res.redirect("/login");
@@ -27,18 +53,32 @@ function requireRole(role) {
   };
 }
 
-// ===== AUTH =====
+/*
+  requireLogin
+  - Ensures user is logged in before accessing page/API
+*/
 function requireLogin(req, res, next) {
   if (!req.session.user) return res.redirect("/login");
   next();
 }
 
-// ===== BASIC ROUTES =====
+/* =========================
+   BASIC ROUTES (PAGES)
+   ========================= */
+
+// Home page
 app.get("/", (req, res) => res.render("index"));
 
+// Authentication pages
 app.get("/login", (req, res) => res.render("login"));
 app.get("/signup", (req, res) => res.render("signup"));
-// ADMIN
+
+/*
+  ROLE-BASED DASHBOARDS
+  - Each role gets a different dashboard UI
+*/
+
+// Admin dashboard page
 app.get("/admin", requireRole("admin"), (req, res) => {
   res.render("admin", {
     page: "admin",
@@ -47,7 +87,7 @@ app.get("/admin", requireRole("admin"), (req, res) => {
   });
 });
 
-// DRIVER
+// Driver dashboard page
 app.get("/driver", requireRole("driver"), (req, res) => {
   res.render("driver", {
     page: "driver",
@@ -56,12 +96,24 @@ app.get("/driver", requireRole("driver"), (req, res) => {
   });
 });
 
+/* =========================
+   AUTH LOGIC
+   ========================= */
+
+// Logout clears session (logs user out)
 app.post("/logout", (req, res) => {
   req.session.destroy(() => {
     res.redirect("/login");
   });
 });
 
+/*
+  LOGIN FLOW (ROLE BASED)
+  - Check email in DB
+  - Validate password
+  - Store user in session
+  - Redirect based on role
+*/
 app.post("/login", (req, res) => {
   const { email, password } = req.body;
 
@@ -74,10 +126,10 @@ app.post("/login", (req, res) => {
       return res.redirect("/login");
     }
 
-    //using the session to make the user logged in
+    // Save user in session (important for authentication)
     req.session.user = user;
 
-    // 🔥 ROLE-BASED REDIRECT
+    // Role-based routing after login
     if (user.role === "admin") return res.redirect("/admin");
     if (user.role === "driver") return res.redirect("/driver");
 
@@ -85,6 +137,29 @@ app.post("/login", (req, res) => {
   });
 });
 
+/* Duplicate login route (safe but redundant) */
+// Keeps same logic but simpler redirect
+app.post("/login", (req, res) => {
+  const { email, password } = req.body;
+
+  db.query("SELECT * FROM Users WHERE email=?", [email], (err, result) => {
+    if (!result.length) return res.redirect("/login");
+
+    const user = result[0];
+    if (user.password_hash !== password) return res.redirect("/login");
+
+    req.session.user = user;
+    res.redirect("/menu");
+  });
+});
+
+/* =========================
+   SIGNUP FLOW (ROLE INSERTION)
+   =========================
+   - Creates user in Users table
+   - Also inserts into role-specific table
+   - Example: Customer / Admin / Driver
+*/
 app.post("/signup", (req, res) => {
   const { username, email, password, role } = req.body;
 
@@ -96,32 +171,24 @@ app.post("/signup", (req, res) => {
 
       const user_id = result.insertId;
 
+      // Role-based table insertion (normalization of database)
       if (role === "customer") {
         db.query(
           "INSERT INTO Customer (customer_id, full_name) VALUES (?, ?)",
           [user_id, username],
-          (err) => {
-            if (err) return res.redirect("/signup?error=Signup+failed");
-            res.redirect("/login?success=Account+created");
-          },
+          () => res.redirect("/login?success=Account+created"),
         );
       } else if (role === "admin") {
         db.query(
           "INSERT INTO Admin (admin_id, full_name) VALUES (?, ?)",
           [user_id, username],
-          (err) => {
-            if (err) return res.redirect("/signup?error=Signup+failed");
-            res.redirect("/login?success=Account+created");
-          },
+          () => res.redirect("/login?success=Account+created"),
         );
       } else if (role === "driver") {
         db.query(
           "INSERT INTO Driver (driver_id, full_name) VALUES (?, ?)",
           [user_id, username],
-          (err) => {
-            if (err) return res.redirect("/signup?error=Signup+failed");
-            res.redirect("/login?success=Account+created");
-          },
+          () => res.redirect("/login?success=Account+created"),
         );
       } else {
         res.redirect("/signup?error=Invalid+role");
@@ -130,7 +197,11 @@ app.post("/signup", (req, res) => {
   );
 });
 
-// ===== VIEWS =====
+/* =========================
+   VIEWS (PAGE RENDERING)
+   ========================= */
+
+// Customer menu page
 app.get("/menu", requireLogin, (req, res) =>
   res.render("menu", {
     page: "menu",
@@ -138,6 +209,8 @@ app.get("/menu", requireLogin, (req, res) =>
     user: req.session.user,
   }),
 );
+
+// Cart page (session-based cart system)
 app.get("/cart", requireLogin, (req, res) =>
   res.render("cart", {
     page: "cart",
@@ -146,30 +219,44 @@ app.get("/cart", requireLogin, (req, res) =>
   }),
 );
 
-// ===== DATA APIs =====
+/* =========================
+   DATA APIs (FRONTEND USE)
+   ========================= */
+
+// Fetch pizzas from database
 app.get("/get-pizzas", requireLogin, (req, res) => {
   db.query("SELECT * FROM Pizza", (err, result) => res.json(result));
 });
 
+// Fetch crust options
 app.get("/get-crusts", requireLogin, (req, res) => {
   db.query("SELECT * FROM Crust", (err, result) => res.json(result));
 });
 
+// Fetch toppings
 app.get("/get-toppings", requireLogin, (req, res) => {
   db.query("SELECT * FROM Toppings", (err, result) => res.json(result));
 });
 
-// GET_DISCOUNT
-// MUSKAAN's PART
+/* =========================
+   DISCOUNT ENGINE (LOGIC CORE)
+   =========================
+   - Calculates best discount based on:
+     1. total orders
+     2. total spending
+*/
 app.get("/get-discount", requireLogin, (req, res) => {
   const user = req.session.user;
   const cart = req.session.cart || [];
+
   let total = 0;
+
+  // Calculate cart total
   cart.forEach((item) => {
     total += Number(item.price) * Number(item.quantity);
   });
 
-  // Step 1: Look at the Customer's History in the database
+  // Get customer stats
   db.query(
     "SELECT total_orders, total_spending FROM Customer WHERE customer_id=?",
     [user.user_id],
@@ -178,53 +265,26 @@ app.get("/get-discount", requireLogin, (req, res) => {
 
       const customer = customerRes[0];
 
-      // Calculate what their stats will be AFTER they complete this current order
-      const predictedTotalOrders = (customer.total_orders || 0) + 1;
-      const predictedTotalSpending = (customer.total_spending || 0) + total;
-
-      // Step 2: Grab the Coupon Book (all available discounts)
+      // Fetch all discounts and choose best match
       db.query("SELECT * FROM Discounts", (err2, discounts) => {
         if (err2) return res.json({ discount: null, finalTotal: total });
 
-        let bestDiscount = null; // Start with no discount
+        let bestDiscount = null;
 
-        // Step 3: Flip Through Every Coupon
-        discounts.forEach((discount) => {
-          let isCouponValid = true; // Assume the coupon works until proven otherwise
+        discounts.forEach((d) => {
+          let valid = true;
 
-          // Step 4: Check the rules on the coupon
-          // Rule 1: Do they have enough past orders?
-          if (
-            discount.min_orders !== null &&
-            predictedTotalOrders < discount.min_orders
-          ) {
-            isCouponValid = false; // Not enough orders, cross it out
-          }
+          if (d.min_orders && total_orders < d.min_orders) valid = false;
+          if (d.min_spending && total_spending < d.min_spending) valid = false;
 
-          // Rule 2: Have they spent enough money in the past?
-          if (
-            discount.min_spending !== null &&
-            predictedTotalSpending < discount.min_spending
-          ) {
-            isCouponValid = false; // Haven't spent enough, cross it out
-          }
-
-          // Step 5: Keep the coupon that gives the biggest percentage off
-          if (isCouponValid) {
-            // If we don't have a best discount yet, OR if this new one is bigger than our current best
-            if (
-              !bestDiscount ||
-              Number(discount.discount_percent) >
-                Number(bestDiscount.discount_percent)
-            ) {
-              bestDiscount = discount; // This is our new best coupon!
-            }
+          if (valid && (!bestDiscount || d.discount_percent > bestDiscount.discount_percent)) {
+            bestDiscount = d;
           }
         });
 
-        // Step 6: Do the Math at the Register
-        let finalTotal = total;
+        // Apply discount
         let discountAmount = 0;
+        let finalTotal = total;
 
         if (bestDiscount) {
           // Calculate the money saved: (Original Price * Discount Percentage) / 100
@@ -245,22 +305,29 @@ app.get("/get-discount", requireLogin, (req, res) => {
   );
 });
 
-// ===== CART =====
+/* =========================
+   CART SYSTEM (SESSION BASED)
+   ========================= */
+
+// Initialize cart if not exists
 function getCart(req) {
   if (!req.session.cart) req.session.cart = [];
   return req.session.cart;
 }
 
+// Get cart items
 app.get("/get-cart", requireLogin, (req, res) => {
   res.json(getCart(req));
 });
 
+// Add item to cart
 app.post("/add-to-cart", requireLogin, (req, res) => {
   const cart = getCart(req);
   cart.push(req.body);
   res.json({ success: true });
 });
 
+// Remove item from cart
 app.post("/remove-from-cart", requireLogin, (req, res) => {
   const { index } = req.body;
   const cart = getCart(req);
@@ -268,32 +335,37 @@ app.post("/remove-from-cart", requireLogin, (req, res) => {
   res.json({ success: true });
 });
 
-// ===== PLACE ORDER =====
-// ===== MUSKAAN's PART ====
+/* =========================
+   ORDER PLACEMENT ENGINE
+   =========================
+   BIG FEATURE:
+   - Calculates order total
+   - Applies discount
+   - Inserts order + items + toppings
+   - Creates delivery entry
+   - Updates customer stats
+   - Clears cart
+*/
 app.post("/place-order", requireLogin, (req, res) => {
   const user = req.session.user;
   const cart = req.session.cart || [];
 
   if (!cart.length) return res.redirect("/cart");
 
-  // 🔹 Step 1: Calculate total
   let total = 0;
+
+  // Step 1: Calculate total
   cart.forEach((item) => {
     total += Number(item.price) * Number(item.quantity);
   });
 
-  // 🔹 Step 2: Look at the Customer's History in the database
+  // Step 2: Get customer stats + discounts
   db.query(
     "SELECT total_orders, total_spending FROM Customer WHERE customer_id=?",
     [user.user_id],
     (err, customerRes) => {
       const customer = customerRes[0];
 
-      // Calculate what their stats will be AFTER they complete this current order
-      const predictedTotalOrders = (customer.total_orders || 0) + 1;
-      const predictedTotalSpending = (customer.total_spending || 0) + total;
-
-      // 🔹 Step 3: Grab the Coupon Book (all available discounts)
       db.query("SELECT * FROM Discounts", (err2, discounts) => {
         let bestDiscount = null; // Start with no discount
 
@@ -342,24 +414,18 @@ app.post("/place-order", requireLogin, (req, res) => {
           finalTotal = total - (total * bestDiscount.discount_percent) / 100;
         }
 
-        // 🔹 Step 4: Insert order
+        // Step 3: Insert order
         db.query(
           "INSERT INTO Orders (customer_id, discount_id, total_amount) VALUES (?, ?, ?)",
           [user.user_id, discount_id, finalTotal],
           (err3, orderRes) => {
             const order_id = orderRes.insertId;
 
-            // 🔹 Step 5: Insert items
+            // Step 4: Insert items + toppings
             cart.forEach((item) => {
               db.query(
                 "INSERT INTO Order_Items (order_id, pizza_id, crust_id, quantity, item_price) VALUES (?, ?, ?, ?, ?)",
-                [
-                  order_id,
-                  item.pizza_id,
-                  item.crust_id,
-                  item.quantity,
-                  item.price,
-                ],
+                [order_id, item.pizza_id, item.crust_id, item.quantity, item.price],
                 (err4, itemRes) => {
                   const item_id = itemRes.insertId;
 
@@ -373,16 +439,15 @@ app.post("/place-order", requireLogin, (req, res) => {
               );
             });
 
-            // 🔥 Step 6: ETA (30 mins from now)
+            // Step 5: Delivery setup (ETA = 30 min)
             const estimatedTime = new Date(Date.now() + 30 * 60000);
 
-            // 🔹 Step 7: Create delivery
             db.query(
               "INSERT INTO Delivery (order_id, delivery_status, estimated_time) VALUES (?, 'pending', ?)",
               [order_id, estimatedTime],
             );
 
-            // 🔹 Step 8: Update customer stats
+            // Step 6: Update customer stats
             db.query(
               `UPDATE Customer 
                SET total_orders = total_orders + 1,
@@ -391,10 +456,10 @@ app.post("/place-order", requireLogin, (req, res) => {
               [finalTotal, user.user_id],
             );
 
-            // 🔹 Step 9: Clear cart
+            // Step 7: Clear cart after successful order
             req.session.cart = [];
 
-            // ✅ FINAL REDIRECT (THIS IS THE IMPORTANT CHANGE)
+            // Redirect to confirmation page
             res.redirect(`/order-confirmation/${order_id}`);
           },
         );
@@ -403,13 +468,34 @@ app.post("/place-order", requireLogin, (req, res) => {
   );
 });
 
+/* =========================
+   CART SUMMARY API
+   ========================= */
+app.get("/cart-data", (req, res) => {
+  const cart = req.session.cart || [];
+
+  let subtotal = 0;
+
+  cart.forEach((item) => {
+    subtotal += Number(item.price) * Number(item.quantity);
+  });
+
+  let discount = 0;
+  if (subtotal > 2000) discount = subtotal * 0.1;
+
+  const finalTotal = subtotal - discount;
+
+  res.json({ items: cart, subtotal, discount, finalTotal });
+});
+
+/* =========================
+   ORDER CONFIRMATION PAGE
+   ========================= */
 app.get("/order-confirmation/:id", requireRole("customer"), (req, res) => {
   const orderId = req.params.id;
 
   db.query(
-    `SELECT o.order_id, o.total_amount, o.created_at
-     FROM Orders o
-     WHERE o.order_id=?`,
+    "SELECT o.order_id, o.total_amount, o.created_at FROM Orders o WHERE o.order_id=?",
     [orderId],
     (err, result) => {
       res.render("confirmation", { order: result[0] });
@@ -417,6 +503,9 @@ app.get("/order-confirmation/:id", requireRole("customer"), (req, res) => {
   );
 });
 
+/* =========================
+   HISTORY PAGE (CUSTOMER)
+   ========================= */
 app.get("/history", requireRole("customer"), (req, res) => {
   res.render("history", {
     page: "history",
@@ -425,27 +514,22 @@ app.get("/history", requireRole("customer"), (req, res) => {
   });
 });
 
+/* GROUPED ORDER HISTORY API */
 app.get("/history-data", requireRole("customer"), (req, res) => {
   db.query(
-    `SELECT 
-      o.order_id,
-      o.total_amount,
-      o.created_at,
-      d.delivery_status,
-      oi.item_id,
-      oi.quantity,
-      p.name AS pizza_name,
-      c.crust_name
-    FROM Orders o
-    LEFT JOIN Delivery d ON o.order_id = d.order_id
-    LEFT JOIN Order_Items oi ON o.order_id = oi.order_id
-    LEFT JOIN Pizza p ON oi.pizza_id = p.pizza_id
-    LEFT JOIN Crust c ON oi.crust_id = c.crust_id
-    WHERE o.customer_id=?
-    ORDER BY o.order_id DESC`,
+    `SELECT o.order_id, o.total_amount, o.created_at, d.delivery_status,
+            oi.item_id, oi.quantity, p.name AS pizza_name, c.crust_name
+     FROM Orders o
+     LEFT JOIN Delivery d ON o.order_id = d.order_id
+     LEFT JOIN Order_Items oi ON o.order_id = oi.order_id
+     LEFT JOIN Pizza p ON oi.pizza_id = p.pizza_id
+     LEFT JOIN Crust c ON oi.crust_id = c.crust_id
+     WHERE o.customer_id=?
+     ORDER BY o.order_id DESC`,
     [req.session.user.user_id],
     (err, rows) => {
-      // 🔥 GROUP DATA BY ORDER
+
+      // Group items under each order (important data structuring step)
       const orders = {};
 
       rows.forEach((r) => {
@@ -473,17 +557,15 @@ app.get("/history-data", requireRole("customer"), (req, res) => {
   );
 });
 
-// ==========================
-// ADMIN: GET ALL ORDERS + DRIVERS
-// ==========================
+/* =========================
+   ADMIN ORDER CONTROL
+   ========================= */
 app.get("/admin/orders", requireRole("admin"), (req, res) => {
   db.query(
-    `
-    SELECT o.order_id, o.status, o.total_amount, d.delivery_status, d.driver_id
-    FROM Orders o
-    LEFT JOIN Delivery d ON o.order_id = d.order_id
-    ORDER BY o.created_at DESC
-  `,
+    `SELECT o.order_id, o.status, o.total_amount, d.delivery_status, d.driver_id
+     FROM Orders o
+     LEFT JOIN Delivery d ON o.order_id = d.order_id
+     ORDER BY o.created_at DESC`,
     (err, orders) => {
       db.query("SELECT driver_id, full_name FROM Driver", (err2, drivers) => {
         res.json({ orders, drivers });
@@ -492,9 +574,7 @@ app.get("/admin/orders", requireRole("admin"), (req, res) => {
   );
 });
 
-// ==========================
-// ADMIN: ASSIGN DRIVER
-// ==========================
+/* Assign driver to order */
 app.post("/admin/assign-driver", requireRole("admin"), (req, res) => {
   const { order_id, driver_id } = req.body;
 
@@ -507,9 +587,11 @@ app.post("/admin/assign-driver", requireRole("admin"), (req, res) => {
   );
 });
 
-// ==========================
-// DRIVER: GET ASSIGNED ORDERS
-// ==========================
+/* =========================
+   DRIVER FEATURES
+   ========================= */
+
+// Get assigned orders
 app.get("/driver/orders", requireRole("driver"), (req, res) => {
   const driver_id = req.session.user.user_id;
 
@@ -523,15 +605,13 @@ app.get("/driver/orders", requireRole("driver"), (req, res) => {
   );
 });
 
-// ==========================
-// DRIVER: UPDATE STATUS
-// ==========================
+// Update delivery status
 app.post("/driver/update-status", requireRole("driver"), (req, res) => {
   const { order_id, status } = req.body;
 
   db.query(
     `UPDATE Delivery 
-     SET delivery_status=?, 
+     SET delivery_status=?,
          delivered_at = IF(?='delivered', NOW(), delivered_at)
      WHERE order_id=?`,
     [status, status, order_id],
@@ -539,42 +619,33 @@ app.post("/driver/update-status", requireRole("driver"), (req, res) => {
   );
 });
 
-// ==========================
-// CUSTOMER ORDER HISTORY
-// ==========================
+/* =========================
+   CUSTOMER ORDER APIs
+   ========================= */
+
+// Full order history with items + toppings
 app.get("/orders/data", requireRole("customer"), (req, res) => {
   const customer_id = req.session.user.user_id;
 
   db.query(
-    `SELECT * FROM Orders 
-     WHERE customer_id=? 
-     ORDER BY created_at DESC`,
+    `SELECT * FROM Orders WHERE customer_id=? ORDER BY created_at DESC`,
     [customer_id],
     (err, orders) => {
-      if (err) return res.json([]);
-
       if (!orders.length) return res.json([]);
 
       const orderIds = orders.map((o) => o.order_id);
 
       db.query(
-        `SELECT 
-            oi.item_id,
-            oi.order_id,
-            oi.quantity,
-            oi.item_price,
-            p.name AS pizza_name,
-            c.crust_name
+        `SELECT oi.*, p.name AS pizza_name, c.crust_name
          FROM Order_Items oi
          JOIN Pizza p ON oi.pizza_id = p.pizza_id
          JOIN Crust c ON oi.crust_id = c.crust_id
          WHERE oi.order_id IN (?)`,
         [orderIds],
         (err2, items) => {
+
           db.query(
-            `SELECT 
-                ot.item_id,
-                t.topping_name
+            `SELECT ot.item_id, t.topping_name
              FROM Order_Toppings ot
              JOIN Toppings t ON ot.topping_id = t.topping_id`,
             (err3, toppings) => {
@@ -587,6 +658,7 @@ app.get("/orders/data", requireRole("customer"), (req, res) => {
   );
 });
 
+// Orders page
 app.get("/orders", requireRole("customer"), (req, res) => {
   res.render("orders", {
     page: "orders",
@@ -595,37 +667,27 @@ app.get("/orders", requireRole("customer"), (req, res) => {
   });
 });
 
-// ==========================
-// CUSTOMER: LIVE TRACKING
-// ==========================
+/* =========================
+   LIVE ORDER TRACKING
+   ========================= */
 app.get("/orders/status", requireRole("customer"), (req, res) => {
   const customer_id = req.session.user.user_id;
 
   db.query(
-    `SELECT 
-      o.order_id,
-      o.created_at,
-      o.total_amount,
-      d.delivery_status,
-      d.estimated_time,
-      d.driver_id,
-      dr.full_name AS driver_name,
-      dr.phone AS driver_phone,
-      oi.item_id,
-      oi.quantity,
-      p.name AS pizza_name,
-      c.crust_name
-    FROM Orders o
-    LEFT JOIN Delivery d ON o.order_id = d.order_id
-    LEFT JOIN Driver dr ON d.driver_id = dr.driver_id
-    LEFT JOIN Order_Items oi ON o.order_id = oi.order_id
-    LEFT JOIN Pizza p ON oi.pizza_id = p.pizza_id
-    LEFT JOIN Crust c ON oi.crust_id = c.crust_id
-    WHERE o.customer_id=?
-    ORDER BY o.order_id DESC`,
+    `SELECT o.order_id, o.created_at, o.total_amount,
+            d.delivery_status, d.estimated_time,
+            dr.full_name AS driver_name, dr.phone AS driver_phone,
+            oi.item_id, oi.quantity, p.name AS pizza_name, c.crust_name
+     FROM Orders o
+     LEFT JOIN Delivery d ON o.order_id = d.order_id
+     LEFT JOIN Driver dr ON d.driver_id = dr.driver_id
+     LEFT JOIN Order_Items oi ON o.order_id = oi.order_id
+     LEFT JOIN Pizza p ON oi.pizza_id = p.pizza_id
+     LEFT JOIN Crust c ON oi.crust_id = c.crust_id
+     WHERE o.customer_id=?
+     ORDER BY o.order_id DESC`,
     [customer_id],
     (err, rows) => {
-      if (err) return res.json([]);
 
       const orders = {};
 
@@ -636,12 +698,9 @@ app.get("/orders/status", requireRole("customer"), (req, res) => {
             total_amount: r.total_amount,
             created_at: r.created_at,
             delivery_status: r.delivery_status,
-
-            // 🔥 FIXES
             estimated_time: r.estimated_time,
             driver_name: r.driver_name,
             driver_phone: r.driver_phone,
-
             items: [],
           };
         }
@@ -660,7 +719,11 @@ app.get("/orders/status", requireRole("customer"), (req, res) => {
   );
 });
 
-// USER DASHBOARD
+/* =========================
+   DASHBOARDS (SUMMARY STATS)
+   ========================= */
+
+// Customer dashboard stats
 app.get("/user-dashboard", requireRole("customer"), (req, res) => {
   const userId = req.session.user.user_id;
 
@@ -678,7 +741,7 @@ app.get("/user-dashboard", requireRole("customer"), (req, res) => {
   );
 });
 
-// ADMIN DASHBOARD
+// Admin dashboard stats
 app.get("/admin-dashboard", requireRole("admin"), (req, res) => {
   db.query(
     "SELECT COUNT(*) AS total_orders, SUM(total_amount) AS revenue FROM Orders",
@@ -693,7 +756,7 @@ app.get("/admin-dashboard", requireRole("admin"), (req, res) => {
   );
 });
 
-// DRIVER DASHBOARD
+// Driver dashboard stats
 app.get("/driver-dashboard", requireRole("driver"), (req, res) => {
   const driverId = req.session.user.user_id;
 
@@ -711,4 +774,7 @@ app.get("/driver-dashboard", requireRole("driver"), (req, res) => {
   );
 });
 
+/* =========================
+   SERVER START
+   ========================= */
 app.listen(PORT, () => console.log("Server running on port", PORT));
