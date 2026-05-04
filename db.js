@@ -1,23 +1,22 @@
+require("dotenv").config();
 const mysql = require("mysql2");
 
-// Create connection pool (better than single connection)
-const db = mysql.createPool({
-  host: "localhost",
-  user: "root",
-  password: "", // change if you have password
-  database: "pizzapp", // IMPORTANT: your new DB
-  waitForConnections: true,
-  connectionLimit: 10,
-  queueLimit: 0,
+// Parse Railway URL safely
+const url = new URL(process.env.MYSQL_PUBLIC_URL);
+
+const db = mysql.createConnection({
+  host: url.hostname,
+  user: url.username,
+  password: url.password,
+  database: url.pathname.replace("/", ""),
+  port: url.port,
 });
 
-// Test connection
-db.getConnection((err, connection) => {
+db.connect((err) => {
   if (err) {
-    console.error("Database connection failed:", err);
+    console.log("Error found in database:", err);
   } else {
-    console.log("✅ MySQL connected to pizzapp");
-    connection.release();
+    console.log("MYSQL successfully connected");
   }
 });
 

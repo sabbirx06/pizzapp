@@ -4,7 +4,7 @@ const db = require("./db");
 const session = require("express-session"); //checks whether the user is logged in or not
 
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json()); // javascript object notation
